@@ -1,5 +1,5 @@
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permission import IsAutheticated
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from .models import Carrinho, ItemCarrinho
@@ -10,14 +10,14 @@ from django.shortcuts import render
 
 # Create your views here.
 @api_view(['GET'])
-@permission_classes([IsAutheticated])
+@permission_classes([IsAuthenticated])
 def ver_carrinho(request):
     carrinho, _ = Carrinho.objects.get_or_create(cliente=request.user)
     serializer = CarrinhoSerializer(carrinho)
     return Response(serializer.data)
 
 @api_view(['POST'])
-@permission_classes([IsAutheticated])
+@permission_classes([IsAuthenticated])
 def adicionar_item(request):
     carrinho, _ = Carrinho.objects.get_or_create(cliente=request.user)
     produto_id = request.data.get('produto')
@@ -39,7 +39,7 @@ def adicionar_item(request):
     return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 @api_view(['DELETE'])
-@permission_classes([IsAutheticated])
+@permission_classes([IsAuthenticated])
 def remover_item(request, item_id):
     try:
         item = ItemCarrinho.objects.get(id=item_id, carrinho__cliente=request.user)
