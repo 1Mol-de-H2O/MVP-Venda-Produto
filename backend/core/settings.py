@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     'produtos',
     'pedidos',
     'cupons',
+    'carrinho',
 ]
 
 AUTH_USER_MODEL = 'usuarios.Usuario'
