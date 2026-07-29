@@ -38,7 +38,7 @@ def finalizar_pedido(request):
             subtotal_do_item = preco_do_produto * quantidade_comprada
             total = total + subtotal_do_item
 
-        pedido = Pedido.objects.create(cliente=request.user, total='pedente')
+        pedido = Pedido.objects.create(cliente=request.user, total=total, status='pendente')
 
         for item in itens_carrinho:
             ItemPedido.objects.create(
@@ -59,7 +59,7 @@ def finalizar_pedido(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def meus_pedidos(request):
-    pedidos = Pedido.objects.filter(cliente = request.user).order_by('-criando_em')
+    pedidos = Pedido.objects.filter(cliente = request.user).order_by('-criado_em')
     serializer = PedidoSerializer(pedidos, many=True)
     return Response(serializer.data)
 
@@ -70,7 +70,7 @@ def detalhe_pedido(request, pedido_id):
     try:
         pedido = Pedido.objects.get(id=pedido_id, cliente = request.user)
     except Pedido.DoesNotExist:
-        return Response({'detail': 'Pedido não encontrado'}, status=status.HTTP_400_NOT_FOUND)
+        return Response({'detail': 'Pedido não encontrado'}, status=status.HTTP_404_NOT_FOUND)
 
     serializer = PedidoSerializer(pedido)
     return Response(serializer.data)
