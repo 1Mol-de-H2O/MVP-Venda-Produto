@@ -6,6 +6,7 @@ from django.db import transaction
 from carrinho.models import Carrinho
 from .models import Pedido, ItemPedido
 from .serializers import PedidoSerializer
+from .frete import calcular_frete
 
 # from django.shortcuts import render
 
@@ -31,22 +32,32 @@ def finalizar_pedido(request):
             )
 
     with transaction.atomic():
-        total = 0
+        subtotal = 0
+        peso_total = 0
         for item in itens_carrinho:
             preco_do_produto = item.produto.preco
             quantidade_comprada = item.quantidade
             subtotal_do_item = preco_do_produto * quantidade_comprada
-            total = total + subtotal_do_item
+            subtotal = subtotal + subtotal_do_item
+            peso_total = peso_total + (item.produto.peso_kg * quantidade_comprada)
 
-        pedido = Pedido.objects.create(cliente=request.user, total=total, status='pendente')
+        frete = calcular_frete(peso_total, valor_compra=subtotal)
+        total = subtotal + frete
+
+        pedido = Pedido.objects.create(
+            cliente=request.user,
+            total=total,
+            frete=frete,
+            status='pendente'
+        )
 
         for item in itens_carrinho:
             ItemPedido.objects.create(
-                pedido = pedido,
-                produto = item.produto,
-                titulo_produto = item.produto.titulo,
-                preco_unitario = item.produto.preco,
-                quantidade = item.quantidade,
+                pedido=pedido,
+                produto=item.produto,
+                titulo_produto=item.produto.titulo,
+                preco_unitario=item.produto.preco,
+                quantidade=item.quantidade,
             )
             item.produto.estoque -= item.quantidade
             item.produto.save()
@@ -74,3 +85,28 @@ def detalhe_pedido(request, pedido_id):
 
     serializer = PedidoSerializer(pedido)
     return Response(serializer.data)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def calcular_frete_carrinho(request):
+    try:
+        carrinho = Carrinho.objects.get(cliente=request.user)
+    except Carrinho.DoesNotExist:
+        return Response({'detail': 'Carrinho vazio'}, status=status.HTTP_400_BAD_REQUEST)
+
+    itens = carrinho.itens.all()
+    if not itens.exists():
+        return Response({'detail': 'Carrinho vazio'}, status=status.HTTP_400_BAD_REQUEST)
+
+    peso_total = 0
+    subtotal = 0
+    for item in itens:
+        peso_do_produto = item.produto.peso_kg
+        quantidade_comprada = item.quantidade
+        peso_do_item = peso_do_produto * quantidade_comprada
+        peso_total = peso_total + peso_do_item
+        subtotal = subtotal + (item.produto.preco * quantidade_comprada)
+
+    frete = calcular_frete(peso_total, valor_compra=subtotal)
+
+    return Response({'peso_total_kg': float(peso_total), 'frete': float(frete),})
