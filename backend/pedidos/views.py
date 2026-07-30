@@ -4,8 +4,9 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.db import transaction
 from carrinho.models import Carrinho
+from cupons.models import Cupom
 from .models import Pedido, ItemPedido
-from .serializers import PedidoSerializer
+from .serializers import PedidoSerializer, FinalizarPedidoSerializer
 from .frete import calcular_frete
 
 # from django.shortcuts import render
@@ -15,6 +16,11 @@ from .frete import calcular_frete
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def finalizar_pedido(request):
+    dados_serializer = FinalizarPedidoSerializer(data=request.data)
+    if not dados_serializer.is_valid():
+        return Response(dados_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    dados = dados_serializer.validated_data
+
     try:
         carrinho = Carrinho.objects.get(cliente=request.user)
     except Carrinho.DoesNotExist:
@@ -26,7 +32,7 @@ def finalizar_pedido(request):
 
     for item in itens_carrinho:
         if item.quantidade > item.produto.estoque:
-            return Response (
+            return Response(
                 {'detail': f'Estoque insuficiente para "{item.produto.titulo}". Disponível: {item.produto.estoque}'},
                 status=status.HTTP_400_BAD_REQUEST
             )
@@ -35,20 +41,45 @@ def finalizar_pedido(request):
         subtotal = 0
         peso_total = 0
         for item in itens_carrinho:
-            preco_do_produto = item.produto.preco
-            quantidade_comprada = item.quantidade
-            subtotal_do_item = preco_do_produto * quantidade_comprada
-            subtotal = subtotal + subtotal_do_item
-            peso_total = peso_total + (item.produto.peso_kg * quantidade_comprada)
+            subtotal = subtotal + (item.produto.preco * item.quantidade)
+            peso_total = peso_total + (item.produto.peso_kg * item.quantidade)
 
         frete = calcular_frete(peso_total, valor_compra=subtotal)
-        total = subtotal + frete
+
+        desconto = 0
+        cupom_codigo = dados.get('cupom_codigo', '').strip()
+        if cupom_codigo:
+            try:
+                cupom = Cupom.objects.get(codigo__iexact=cupom_codigo)
+            except Cupom.DoesNotExist:
+                return Response({'detail': 'Cupom não encontrado.'}, status=status.HTTP_400_BAD_REQUEST)
+
+            valido, motivo = cupom.esta_valido(valor_compra=subtotal)
+            if not valido:
+                return Response({'detail': f'Cupom inválido: {motivo}'}, status=status.HTTP_400_BAD_REQUEST)
+
+            desconto = cupom.calcular_desconto(subtotal)
+            cupom.usos_atuais += 1
+            cupom.save()
+
+        total = subtotal + frete - desconto
 
         pedido = Pedido.objects.create(
             cliente=request.user,
-            total=total,
+            subtotal=subtotal,
             frete=frete,
-            status='pendente'
+            desconto=desconto,
+            total=total,
+            cupom_codigo=cupom_codigo or None,
+            status='pendente',
+            endereco_cep=dados['endereco_cep'],
+            endereco_rua=dados['endereco_rua'],
+            endereco_numero=dados['endereco_numero'],
+            endereco_complemento=dados.get('endereco_complemento', ''),
+            endereco_bairro=dados['endereco_bairro'],
+            endereco_cidade=dados['endereco_cidade'],
+            endereco_estado=dados['endereco_estado'],
+            metodo_pagamento=dados['metodo_pagamento'],
         )
 
         for item in itens_carrinho:
@@ -67,10 +98,11 @@ def finalizar_pedido(request):
     serializer = PedidoSerializer(pedido)
     return Response(serializer.data, status=status.HTTP_201_CREATED)
 
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def meus_pedidos(request):
-    pedidos = Pedido.objects.filter(cliente = request.user).order_by('-criado_em')
+    pedidos = Pedido.objects.filter(cliente=request.user).order_by('-criado_em')
     serializer = PedidoSerializer(pedidos, many=True)
     return Response(serializer.data)
 
@@ -79,12 +111,13 @@ def meus_pedidos(request):
 @permission_classes([IsAuthenticated])
 def detalhe_pedido(request, pedido_id):
     try:
-        pedido = Pedido.objects.get(id=pedido_id, cliente = request.user)
+        pedido = Pedido.objects.get(id=pedido_id, cliente=request.user)
     except Pedido.DoesNotExist:
         return Response({'detail': 'Pedido não encontrado'}, status=status.HTTP_404_NOT_FOUND)
 
     serializer = PedidoSerializer(pedido)
     return Response(serializer.data)
+
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -101,12 +134,13 @@ def calcular_frete_carrinho(request):
     peso_total = 0
     subtotal = 0
     for item in itens:
-        peso_do_produto = item.produto.peso_kg
-        quantidade_comprada = item.quantidade
-        peso_do_item = peso_do_produto * quantidade_comprada
-        peso_total = peso_total + peso_do_item
-        subtotal = subtotal + (item.produto.preco * quantidade_comprada)
+        peso_total = peso_total + (item.produto.peso_kg * item.quantidade)
+        subtotal = subtotal + (item.produto.preco * item.quantidade)
 
     frete = calcular_frete(peso_total, valor_compra=subtotal)
 
-    return Response({'peso_total_kg': float(peso_total), 'frete': float(frete),})
+    return Response({
+        'peso_total_kg': float(peso_total),
+        'subtotal': float(subtotal),
+        'frete': float(frete),
+    })
