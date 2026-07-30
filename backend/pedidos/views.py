@@ -144,3 +144,57 @@ def calcular_frete_carrinho(request):
         'subtotal': float(subtotal),
         'frete': float(frete),
     })
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def minhas_vendas(request):
+    if not request.user.is_vendedor:
+        return Response({'detail': 'Apenas vendedores podem acessar'}, 
+                         status=status.HTTP_403_FORBIDEN)
+
+    itens_vendidos = ItemPedido.objects.filter(produto__vendedor=request.user
+    ).select_related('pedido', 'pedido__cliente', 'produto').order_by('-pedido__criado_em')
+
+    status_filtro = request.query_params.get('status')
+    if status_filtro:
+        itens_vendidos = itens_vendidos.filter(pedido__status=status_filtro)
+
+    resultado = []
+    for item in itens_vendidos:
+        resultado.append({
+            'pedido_id': item.pedido.id,
+            'cliente': item.pedido.cliente.username,
+            'cliente_email': item.pedido.cliente.email,
+            'produto': item.titulo_produto,
+            'quantidade': item.quantidade,
+            'preco_unitario': float(item.preco_unitario),
+            'subtotal': float(item.preco_unitario * item.quantidade),
+            'status_pedido': item.pedido.status,
+            'data': item.pedido.criado_em,
+        })
+
+    return Response(resultado)
+
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated])
+def atualizar_status_pedido(request, pedido_id):
+    if not request.user.is_vendedor:
+        return Response({'detail': 'Apenas vendedores podem atualizar status de pedidos.'}, status=status.HTTP_403_FORBIDDEN)
+
+    item = ItemPedido.objects.filter(
+        pedido_id=pedido_id, produto__vendedor=request.user
+    ).select_related('pedido').first()
+
+    if not item:
+        return Response({'detail': 'Pedido não encontrado.'}, status=status.HTTP_404_NOT_FOUND)
+
+    novo_status = request.data.get('status')
+    if novo_status not in dict(Pedido.STATUS_CHOICES):
+        return Response({'detail': 'Status inválido.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    pedido = item.pedido
+    pedido.status = novo_status
+    pedido.save()
+
+    serializer = PedidoSerializer(pedido)
+    return Response(serializer.data)
