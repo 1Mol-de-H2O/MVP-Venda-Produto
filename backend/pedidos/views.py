@@ -150,7 +150,7 @@ def calcular_frete_carrinho(request):
 def minhas_vendas(request):
     if not request.user.is_vendedor:
         return Response({'detail': 'Apenas vendedores podem acessar'}, 
-                         status=status.HTTP_403_FORBIDEN)
+                         status=status.HTTP_403_FORBIDDEN)
 
     itens_vendidos = ItemPedido.objects.filter(produto__vendedor=request.user
     ).select_related('pedido', 'pedido__cliente', 'produto').order_by('-pedido__criado_em')

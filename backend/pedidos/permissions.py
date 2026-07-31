@@ -1,5 +1,5 @@
-from rest_framework import permissios
+from rest_framework import permissions
 
-class IsDonoDoPedido(permissios.BasePermission):
+class IsDonoDoPedido(permissions.BasePermission):
     def has_object_permission(self, request, view, obj):
         return obj.cliente == request.user
