@@ -41,6 +41,7 @@ class Cupom(models.Model):
             return Decimal('0.00')
 
         desconto = (valor_compra * self.desconto_percentual/Decimal('100'))
+        desconto = desconto.quantize(Decimal('0.01'))
 
         return min(desconto, valor_compra)
     
