@@ -17,6 +17,7 @@ class Produto(models.Model):
     vendedor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='produtos')
     peso_kg = models.DecimalField(max_digits=6, decimal_places=2, default=1)
     criado_em = models.DateTimeField(auto_now_add=True)
+    imagem = models.ImageField(upload_to='produtos/', null=True, blank=True)
 
     def __str__(self):
         return self.titulo
