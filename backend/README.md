@@ -39,7 +39,7 @@ venv\Scripts\activate      # Windows
 source venv/bin/activate   # Linux/Mac
 
 # instalar dependências
-pip install django djangorestframework mysqlclient django-cors-headers djangorestframework-simplejwt django-filter python-decouple
+pip install django djangorestframework mysqlclient django-cors-headers djangorestframework-simplejwt django-filter python-decouple Pillow
 
 ```
 é preciso criar o arquivo .env na raiz do backend (mesma pasta do manage.py).  
