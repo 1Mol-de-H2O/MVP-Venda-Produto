@@ -75,12 +75,12 @@ No entanto olhe a resposta do ```runserver```
 
 ```
 backend/
-├── core/           # configurações do projeto (settings, urls)
-├── usuarios/       # autenticação, cliente/vendedor
-├── produtos/       # produtos e categorias
-├── carrinho/       # carrinho de compras
-├── pedidos/        # checkout, frete, vendas
-└── cupons/         # cupons de desconto
+├── core/           - configurações do projeto (settings, urls)
+├── usuarios/       - autenticação, cliente/vendedor
+├── produtos/       - produtos e categorias
+├── carrinho/       - carrinho de compras
+├── pedidos/        - checkout, frete, vendas
+└── cupons/         - cupons de desconto
 ```
 
 ---
